@@ -17,7 +17,7 @@ export class JavaScriptRuntime {
   }
   
   private initializeGlobalObjects(): void {
-    const wrapNativeFunction = (fn: Function): RuntimeValue => {
+    const wrapNativeFunction = (fn: (...args: any[]) => any): RuntimeValue => {
       const jsFunction = FunctionCall.createNativeFunction(fn);
       return new JSValue(RuntimeType.Function, jsFunction);
     };
@@ -30,7 +30,7 @@ export class JavaScriptRuntime {
     
     this.globalContext.declare('read', 
       wrapNativeFunction(() => {
-        return 0; 
+        return 0;
       })
     );
     
