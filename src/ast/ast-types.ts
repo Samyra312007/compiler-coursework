@@ -68,6 +68,13 @@ export interface ExpressionStatement {
   expression: Expression;
 }
 
+export interface MemberExpression {
+  type: 'MemberExpression';
+  object: Expression;
+  property: Expression | Identifier;
+  computed: boolean; 
+}
+
 export type Expression = 
   | BinaryExpression
   | UnaryExpression
