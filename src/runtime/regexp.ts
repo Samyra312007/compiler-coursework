@@ -2,12 +2,12 @@ import { RuntimeValue, RuntimeType, JSValue } from './types.js';
 
 export class JSRegExp {
   private pattern: RegExp;
-  private flags: string;
+  private regexFlags: string;
   private lastIndex: number = 0;
   
   constructor(pattern: string, flags?: string) {
-    this.flags = flags || '';
-    this.pattern = new RegExp(pattern, this.flags);
+    this.regexFlags = flags || '';
+    this.pattern = new RegExp(pattern, this.regexFlags);
   }
   
   test(str: string): boolean {
@@ -37,31 +37,31 @@ export class JSRegExp {
   }
   
   get flags(): string {
-    return this.flags;
+    return this.regexFlags;
   }
   
   get global(): boolean {
-    return this.flags.includes('g');
+    return this.regexFlags.includes('g');
   }
   
   get ignoreCase(): boolean {
-    return this.flags.includes('i');
+    return this.regexFlags.includes('i');
   }
   
   get multiline(): boolean {
-    return this.flags.includes('m');
+    return this.regexFlags.includes('m');
   }
   
   get dotAll(): boolean {
-    return this.flags.includes('s');
+    return this.regexFlags.includes('s');
   }
   
   get unicode(): boolean {
-    return this.flags.includes('u');
+    return this.regexFlags.includes('u');
   }
   
   get sticky(): boolean {
-    return this.flags.includes('y');
+    return this.regexFlags.includes('y');
   }
   
   reset(): void {
@@ -70,7 +70,6 @@ export class JSRegExp {
   }
 }
 
-// String methods that work with regex
 export class RegexStringMethods {
   static match(str: string, regex: JSRegExp): RegExpMatchArray | null {
     if (regex.global) {
