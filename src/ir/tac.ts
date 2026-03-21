@@ -4,26 +4,21 @@ export enum TACOp {
   MUL = 'MUL',
   DIV = 'DIV',
   MOD = 'MOD',
-  
   EQ = 'EQ',
   NE = 'NE',
   LT = 'LT',
   GT = 'GT',
   LE = 'LE',
   GE = 'GE',
-  
   AND = 'AND',
   OR = 'OR',
   NOT = 'NOT',
-  
   ASSIGN = 'ASSIGN',
   LOAD = 'LOAD',
   STORE = 'STORE',
-  
   LABEL = 'LABEL',
   JUMP = 'JUMP',
   COND_JUMP = 'COND_JUMP',
-  
   CALL = 'CALL',
   PARAM = 'PARAM',
   RETURN = 'RETURN'
@@ -31,10 +26,10 @@ export enum TACOp {
 
 export interface TACInstruction {
   op: TACOp;
-  result?: string;  // Destination (temporary or variable)
-  arg1?: string;    // First operand
-  arg2?: string;    // Second operand
-  label?: number;   // For jumps
+  result?: string;
+  arg1?: string;
+  arg2?: string;
+  label?: number;
 }
 
 export class TACGenerator {
@@ -47,7 +42,11 @@ export class TACGenerator {
     this.tempCounter = 0;
     this.labelCounter = 0;
     
-    this.generateNode(ast);
+    if (ast && ast.body) {
+      for (const stmt of ast.body) {
+        this.generateNode(stmt);
+      }
+    }
     
     return this.instructions;
   }
@@ -107,7 +106,6 @@ export class TACGenerator {
   }
 
   private generateFunctionDeclaration(node: any): string | null {
- 
     const label = this.newLabel();
     this.addInstruction({
       op: TACOp.LABEL,
@@ -116,10 +114,7 @@ export class TACGenerator {
     });
     
     this.generateNode(node.body);
-    
-    this.addInstruction({
-      op: TACOp.RETURN
-    });
+    this.addInstruction({ op: TACOp.RETURN });
     
     return null;
   }
@@ -132,31 +127,20 @@ export class TACGenerator {
     
     this.addInstruction({
       op: TACOp.COND_JUMP,
-      arg1: cond,
+      arg1: cond || 'false',
       arg2: 'false',
       label: elseLabel
     });
     
     this.generateNode(node.consequent);
-    
-    this.addInstruction({
-      op: TACOp.JUMP,
-      label: endLabel
-    });
-    
-    this.addInstruction({
-      op: TACOp.LABEL,
-      label: elseLabel
-    });
+    this.addInstruction({ op: TACOp.JUMP, label: endLabel });
+    this.addInstruction({ op: TACOp.LABEL, label: elseLabel });
     
     if (node.alternate) {
       this.generateNode(node.alternate);
     }
     
-    this.addInstruction({
-      op: TACOp.LABEL,
-      label: endLabel
-    });
+    this.addInstruction({ op: TACOp.LABEL, label: endLabel });
     
     return null;
   }
@@ -165,31 +149,20 @@ export class TACGenerator {
     const startLabel = this.newLabel();
     const endLabel = this.newLabel();
     
-    this.addInstruction({
-      op: TACOp.LABEL,
-      label: startLabel
-    });
+    this.addInstruction({ op: TACOp.LABEL, label: startLabel });
     
     const cond = this.generateNode(node.test);
     
     this.addInstruction({
       op: TACOp.COND_JUMP,
-      arg1: cond,
+      arg1: cond || 'false',
       arg2: 'false',
       label: endLabel
     });
     
     this.generateNode(node.body);
-    
-    this.addInstruction({
-      op: TACOp.JUMP,
-      label: startLabel
-    });
-    
-    this.addInstruction({
-      op: TACOp.LABEL,
-      label: endLabel
-    });
+    this.addInstruction({ op: TACOp.JUMP, label: startLabel });
+    this.addInstruction({ op: TACOp.LABEL, label: endLabel });
     
     return null;
   }
@@ -199,12 +172,10 @@ export class TACGenerator {
       const value = this.generateNode(node.argument);
       this.addInstruction({
         op: TACOp.RETURN,
-        arg1: value
+        arg1: value || undefined
       });
     } else {
-      this.addInstruction({
-        op: TACOp.RETURN
-      });
+      this.addInstruction({ op: TACOp.RETURN });
     }
     return null;
   }
@@ -214,6 +185,10 @@ export class TACGenerator {
       this.generateNode(stmt);
     }
     return null;
+  }
+
+  private generateExpression(node: any): string | null {
+    return this.generateNode(node);
   }
 
   private generateBinaryExpression(node: any): string {
@@ -242,8 +217,8 @@ export class TACGenerator {
     this.addInstruction({
       op,
       result,
-      arg1: left!,
-      arg2: right!
+      arg1: left || '0',
+      arg2: right || '0'
     });
     
     return result;
