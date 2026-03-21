@@ -3,7 +3,7 @@ import {
   Program, Statement, Expression, 
   VariableDeclaration, FunctionDeclaration,
   IfStatement, WhileStatement, BlockStatement,
-  BinaryExpression, Identifier, Literal, ReturnStatement, ExpressionStatement
+  BinaryExpression, Identifier, Literal, ReturnStatement, ExpressionStatement, 
 } from '../ast/ast-types.js';
 
 export class Parser {
@@ -77,7 +77,8 @@ export class Parser {
       
     } while (this.match(TokenType.Comma));
     
-    this.consume(TokenType.Semicolon, "Expected ';' after variable declaration");
+    if (this.match(TokenType.Semicolon)) {
+    }
     
     return {
       type: 'VariableDeclaration',
@@ -163,11 +164,12 @@ export class Parser {
   private parseReturnStatement(): ReturnStatement {
     let argument: Expression | null = null;
     
-    if (!this.check(TokenType.Semicolon)) {
+    if (!this.check(TokenType.Semicolon) && !this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       argument = this.parseExpression();
     }
     
-    this.consume(TokenType.Semicolon, "Expected ';' after return statement");
+    if (this.match(TokenType.Semicolon)) {
+    }
     
     return {
       type: 'ReturnStatement',
@@ -177,7 +179,9 @@ export class Parser {
 
   private parseExpressionStatement(): ExpressionStatement {
     const expression = this.parseExpression();
-    this.consume(TokenType.Semicolon, "Expected ';' after expression");
+    
+    if (this.match(TokenType.Semicolon)) {
+    }
     
     return {
       type: 'ExpressionStatement',
@@ -185,7 +189,6 @@ export class Parser {
     };
   }
 
-  // Expression parsing with precedence climbing
   private parseExpression(): Expression {
     return this.parseAssignment();
   }
@@ -268,7 +271,7 @@ export class Parser {
   private parseFactor(): Expression {
     let expr = this.parseUnary();
     
-    while (this.match(TokenType.Star) || this.match(TokenType.Slash)) {
+    while (this.match(TokenType.Star) || this.match(TokenType.Slash) || this.match(TokenType.Percent)) {
       const operator = this.previous().lexeme;
       const right = this.parseUnary();
       expr = {
@@ -283,7 +286,7 @@ export class Parser {
   }
 
   private parseUnary(): Expression {
-    if (this.match(TokenType.Minus) || this.match(TokenType.Plus)) {
+    if (this.match(TokenType.Minus) || this.match(TokenType.Plus) || this.match(TokenType.Not)) {
       const operator = this.previous().lexeme;
       const argument = this.parseUnary();
       
