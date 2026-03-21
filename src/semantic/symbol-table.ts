@@ -9,7 +9,11 @@ export enum DataType {
   Number = 'Number',
   String = 'String',
   Boolean = 'Boolean',
+  Object = 'Object',
+  Array = 'Array',
+  Function = 'Function',
   Null = 'Null',
+  Undefined = 'Undefined',
   Any = 'Any',
   Void = 'Void'
 }
@@ -22,6 +26,7 @@ export interface Symbol {
   declaredAt: number;
   isInitialized: boolean;
   isUsed: boolean;
+  binding?: number;
 }
 
 export class Scope {
@@ -56,6 +61,10 @@ export class Scope {
   public lookupCurrent(name: string): Symbol | undefined {
     return this.symbols.get(name);
   }
+  
+  public getAllSymbols(): Map<string, Symbol> {
+    return this.symbols;
+  }
 }
 
 export class SymbolTable {
@@ -81,9 +90,36 @@ export class SymbolTable {
     });
     
     this.currentScope.declare({
-      name: 'read',
+      name: 'console',
       kind: SymbolKind.Builtin,
-      type: DataType.Number,
+      type: DataType.Object,
+      declaredAt: 0,
+      isInitialized: true,
+      isUsed: false
+    });
+    
+    this.currentScope.declare({
+      name: 'log',
+      kind: SymbolKind.Builtin,
+      type: DataType.Void,
+      declaredAt: 0,
+      isInitialized: true,
+      isUsed: false
+    });
+
+    this.currentScope.declare({
+      name: 'Math',
+      kind: SymbolKind.Builtin,
+      type: DataType.Object,
+      declaredAt: 0,
+      isInitialized: true,
+      isUsed: false
+    });
+    
+    this.currentScope.declare({
+      name: 'JSON',
+      kind: SymbolKind.Builtin,
+      type: DataType.Object,
       declaredAt: 0,
       isInitialized: true,
       isUsed: false
@@ -127,6 +163,23 @@ export class SymbolTable {
     const symbol = this.lookup(name);
     if (symbol) {
       symbol.isInitialized = true;
+    }
+  }
+  
+  public getCurrentScope(): Scope {
+    return this.currentScope;
+  }
+
+  public printSymbolTable(): void {
+    console.log('\nSymbol Table:');
+    console.log('='.repeat(50));
+    
+    for (const scope of this.scopes) {
+      console.log(`\nScope Level ${scope.level}:`);
+      const symbols = scope.getAllSymbols();
+      for (const [name, symbol] of symbols) {
+        console.log(`  ${name}: ${symbol.kind} (${symbol.type}) - Initialized: ${symbol.isInitialized}, Used: ${symbol.isUsed}`);
+      }
     }
   }
 }
