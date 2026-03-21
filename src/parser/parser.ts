@@ -3,7 +3,9 @@ import {
   Program, Statement, Expression, 
   VariableDeclaration, FunctionDeclaration,
   IfStatement, WhileStatement, BlockStatement,
-  BinaryExpression, Identifier, Literal, ReturnStatement, ExpressionStatement, 
+  BinaryExpression, Identifier, Literal, 
+  ReturnStatement, ExpressionStatement, UnaryExpression,
+  MemberExpression, CallExpression
 } from '../ast/ast-types.js';
 
 export class Parser {
@@ -77,8 +79,7 @@ export class Parser {
       
     } while (this.match(TokenType.Comma));
     
-    if (this.match(TokenType.Semicolon)) {
-    }
+    this.match(TokenType.Semicolon);
     
     return {
       type: 'VariableDeclaration',
@@ -168,8 +169,7 @@ export class Parser {
       argument = this.parseExpression();
     }
     
-    if (this.match(TokenType.Semicolon)) {
-    }
+    this.match(TokenType.Semicolon);
     
     return {
       type: 'ReturnStatement',
@@ -180,8 +180,7 @@ export class Parser {
   private parseExpressionStatement(): ExpressionStatement {
     const expression = this.parseExpression();
     
-    if (this.match(TokenType.Semicolon)) {
-    }
+    this.match(TokenType.Semicolon);
     
     return {
       type: 'ExpressionStatement',
@@ -194,7 +193,7 @@ export class Parser {
   }
 
   private parseAssignment(): Expression {
-    const expr = this.parseEquality();
+    const expr = this.parseLogicalOr();
     
     if (this.match(TokenType.Equals)) {
       const value = this.parseAssignment();
@@ -209,6 +208,40 @@ export class Parser {
       }
       
       throw this.error("Invalid assignment target");
+    }
+    
+    return expr;
+  }
+
+  private parseLogicalOr(): Expression {
+    let expr = this.parseLogicalAnd();
+    
+    while (this.match(TokenType.Or)) {
+      const operator = this.previous().lexeme;
+      const right = this.parseLogicalAnd();
+      expr = {
+        type: 'BinaryExpression',
+        operator,
+        left: expr,
+        right
+      };
+    }
+    
+    return expr;
+  }
+
+  private parseLogicalAnd(): Expression {
+    let expr = this.parseEquality();
+    
+    while (this.match(TokenType.And)) {
+      const operator = this.previous().lexeme;
+      const right = this.parseEquality();
+      expr = {
+        type: 'BinaryExpression',
+        operator,
+        left: expr,
+        right
+      };
     }
     
     return expr;
@@ -297,7 +330,58 @@ export class Parser {
       };
     }
     
-    return this.parsePrimary();
+    return this.parseCall();
+  }
+
+  private parseCall(): Expression {
+    let expr = this.parsePrimary();
+    
+    while (true) {
+      if (this.match(TokenType.Dot)) {
+        const name = this.consume(TokenType.Identifier, "Expected property name after '.'");
+        expr = {
+          type: 'MemberExpression',
+          object: expr,
+          property: {
+            type: 'Identifier',
+            name: name.lexeme
+          },
+          computed: false
+        };
+      }
+      else if (this.match(TokenType.LeftBracket)) {
+        const property = this.parseExpression();
+        this.consume(TokenType.RightBracket, "Expected ']' after property");
+        expr = {
+          type: 'MemberExpression',
+          object: expr,
+          property: property,
+          computed: true
+        };
+      }
+      else if (this.match(TokenType.LeftParen)) {
+        const args: Expression[] = [];
+        
+        if (!this.check(TokenType.RightParen)) {
+          do {
+            args.push(this.parseExpression());
+          } while (this.match(TokenType.Comma));
+        }
+        
+        this.consume(TokenType.RightParen, "Expected ')' after arguments");
+        
+        expr = {
+          type: 'CallExpression',
+          callee: expr,
+          arguments: args
+        };
+      }
+      else {
+        break;
+      }
+    }
+    
+    return expr;
   }
 
   private parsePrimary(): Expression {
@@ -347,7 +431,6 @@ export class Parser {
     };
   }
 
-  // Parser utilities
   private match(...types: TokenType[]): boolean {
     for (const type of types) {
       if (this.check(type)) {
