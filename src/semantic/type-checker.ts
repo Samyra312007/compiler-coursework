@@ -249,15 +249,14 @@ export class TypeChecker {
       }
       
       case 'MemberExpression': {
-        this.getExpressionType(node.object);
-        if (node.property.type === 'Identifier') {
-          return DataType.Any;
+        const objectType = this.getExpressionType(node.object);
+        if (node.object.type === 'Identifier' && node.object.name === 'console') {
+          if (node.property.type === 'Identifier' && node.property.name === 'log') {
+            return DataType.Void;
+          }
         }
         return DataType.Any;
       }
-      
-      default:
-        return DataType.Any;
     }
   }
 
