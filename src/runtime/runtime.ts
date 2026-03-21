@@ -17,26 +17,30 @@ export class JavaScriptRuntime {
   }
   
   private initializeGlobalObjects(): void {
-    // Global functions
+    const wrapNativeFunction = (fn: Function): RuntimeValue => {
+      const jsFunction = FunctionCall.createNativeFunction(fn);
+      return new JSValue(RuntimeType.Function, jsFunction);
+    };
+    
     this.globalContext.declare('print', 
-      FunctionCall.createNativeFunction((...args: any[]) => {
+      wrapNativeFunction((...args: any[]) => {
         console.log(...args);
       })
     );
     
     this.globalContext.declare('read', 
-      FunctionCall.createNativeFunction(() => {
-        // Simple read implementation
-        return parseInt(prompt('Enter a number:') || '0');
+      wrapNativeFunction(() => {
+        return 0; 
       })
     );
     
-    // Global constructors
     this.globalContext.declare('Array', 
-      FunctionCall.createNativeFunction((...args: any[]) => {
+      wrapNativeFunction((...args: any[]) => {
         if (args.length === 1 && typeof args[0] === 'number') {
           const arr = new JSArray();
-          arr.length = args[0];
+          for (let i = 0; i < args[0]; i++) {
+            arr.set(i, undefined);
+          }
           return arr;
         }
         return new JSArray(...args);
@@ -44,28 +48,27 @@ export class JavaScriptRuntime {
     );
     
     this.globalContext.declare('RegExp', 
-      FunctionCall.createNativeFunction((pattern: string, flags?: string) => {
+      wrapNativeFunction((pattern: string, flags?: string) => {
         return new JSRegExp(pattern, flags);
       })
     );
     
     this.globalContext.declare('Map', 
-      FunctionCall.createNativeFunction(() => new JSMap())
+      wrapNativeFunction(() => new JSMap())
     );
     
     this.globalContext.declare('Set', 
-      FunctionCall.createNativeFunction(() => new JSSet())
+      wrapNativeFunction(() => new JSSet())
     );
     
     this.globalContext.declare('WeakMap', 
-      FunctionCall.createNativeFunction(() => new JSWeakMap())
+      wrapNativeFunction(() => new JSWeakMap())
     );
     
     this.globalContext.declare('WeakSet', 
-      FunctionCall.createNativeFunction(() => new JSWeakSet())
+      wrapNativeFunction(() => new JSWeakSet())
     );
     
-    // Global objects
     this.globalContext.declare('Math', 
       new JSValue(RuntimeType.Object, {
         PI: Math.PI,
@@ -89,7 +92,6 @@ export class JavaScriptRuntime {
       })
     );
     
-    // Console object for debugging
     this.globalContext.declare('console', 
       new JSValue(RuntimeType.Object, {
         log: (...args: any[]) => console.log(...args),
@@ -99,7 +101,6 @@ export class JavaScriptRuntime {
     );
   }
   
-  // Type conversion helpers for the compiler
   convertToRuntimeValue(jsValue: any): RuntimeValue {
     return TypeConverter.toValue(jsValue);
   }
@@ -108,7 +109,6 @@ export class JavaScriptRuntime {
     return value.value;
   }
   
-  // Operation handlers for the compiler
   performBinaryOperation(
     op: string,
     left: RuntimeValue,
