@@ -3,12 +3,27 @@ import { TypeConverter } from './conversions.js';
 
 export class JSArray {
   private elements: any[];
-  private length: number;
+  private _length: number;
   private gcId?: number;
   
   constructor(...elements: any[]) {
     this.elements = [...elements];
-    this.length = this.elements.length;
+    this._length = this.elements.length;
+  }
+
+  get length(): number {
+    return this._length;
+  }
+
+  set length(value: number){
+    if (value < this._length){
+      this.elements.length = value;
+    } else if (value > this._length){
+      for (let i = this._length; i < value; i++){
+        this.elements[i] = undefined;
+      }
+    }
+    this._length = value;
   }
   
   // Core array methods
@@ -291,10 +306,6 @@ export class JSArray {
     if (index >= this.length) {
       this.length = index + 1;
     }
-  }
-  
-  getLength(): number {
-    return this.length;
   }
   
   toArray(): any[] {
