@@ -4,12 +4,14 @@ import { SymbolTable, SymbolKind, DataType } from './symbol-table.js';
 export class TypeChecker {
   private symbolTable: SymbolTable;
   private errors: Array<{ message: string; line: number }> = [];
+  private currentFunction: string | null = null;
 
   constructor() {
     this.symbolTable = new SymbolTable();
   }
 
   public check(ast: Program): boolean {
+    this.errors = [];
     try {
       this.visitProgram(ast);
     } catch (error) {
@@ -30,43 +32,48 @@ export class TypeChecker {
   private visitStatement(node: Statement): void {
     switch (node.type) {
       case 'VariableDeclaration':
-        this.visitVariableDeclaration(node);
+        this.visitVariableDeclaration(node as any);
         break;
       case 'FunctionDeclaration':
-        this.visitFunctionDeclaration(node);
+        this.visitFunctionDeclaration(node as any);
         break;
       case 'IfStatement':
-        this.visitIfStatement(node);
+        this.visitIfStatement(node as any);
         break;
       case 'WhileStatement':
-        this.visitWhileStatement(node);
+        this.visitWhileStatement(node as any);
         break;
       case 'BlockStatement':
-        this.visitBlockStatement(node);
+        this.visitBlockStatement(node as any);
         break;
       case 'ReturnStatement':
-        this.visitReturnStatement(node);
+        this.visitReturnStatement(node as any);
         break;
       case 'ExpressionStatement':
-        this.visitExpression(node.expression);
+        this.visitExpression((node as any).expression);
         break;
     }
   }
 
   private visitVariableDeclaration(node: any): void {
     for (const decl of node.declarations) {
-      if (this.symbolTable.lookupCurrent(decl.id.name)) {
-        throw new Error(`Duplicate declaration: ${decl.id.name}`);
+      const varName = decl.id.name;
+      
+      if (this.symbolTable.lookupCurrent(varName)) {
+        this.addError(`Duplicate declaration: ${varName}`, 0);
+        continue;
       }
       
       let type = DataType.Any;
       if (decl.init) {
         const initType = this.getExpressionType(decl.init);
         type = initType;
+      } else {
+        type = DataType.Any;
       }
       
       this.symbolTable.declare({
-        name: decl.id.name,
+        name: varName,
         kind: SymbolKind.Variable,
         type,
         declaredAt: 0,
@@ -81,16 +88,19 @@ export class TypeChecker {
   }
 
   private visitFunctionDeclaration(node: any): void {
+    const funcName = node.name.name;
+    
     this.symbolTable.declare({
-      name: node.name.name,
+      name: funcName,
       kind: SymbolKind.Function,
-      type: DataType.Any, 
+      type: DataType.Any,
       declaredAt: 0,
       isInitialized: true,
       isUsed: false
     });
     
     this.symbolTable.enterScope();
+    this.currentFunction = funcName;
     
     for (const param of node.params) {
       this.symbolTable.declare({
@@ -106,13 +116,14 @@ export class TypeChecker {
     this.visitBlockStatement(node.body);
     
     this.symbolTable.exitScope();
+    this.currentFunction = null;
   }
 
   private visitIfStatement(node: any): void {
     const testType = this.getExpressionType(node.test);
     
     if (testType !== DataType.Boolean && testType !== DataType.Any) {
-      throw new Error('If condition must be a boolean expression');
+      this.addError('If condition must be a boolean expression', 0);
     }
     
     this.visitExpression(node.test);
@@ -126,7 +137,7 @@ export class TypeChecker {
     const testType = this.getExpressionType(node.test);
     
     if (testType !== DataType.Boolean && testType !== DataType.Any) {
-      throw new Error('While condition must be a boolean expression');
+      this.addError('While condition must be a boolean expression', 0);
     }
     
     this.visitExpression(node.test);
@@ -150,16 +161,12 @@ export class TypeChecker {
   }
 
   private visitExpression(node: Expression): DataType {
-    const type = this.getExpressionType(node);
-    
-    if (node.type === 'Identifier') {
-      this.symbolTable.markUsed(node.name);
-    }
-    
-    return type;
+    return this.getExpressionType(node);
   }
 
   private getExpressionType(node: Expression): DataType {
+    if (!node) return DataType.Any;
+    
     switch (node.type) {
       case 'Literal': {
         if (node.value === null) return DataType.Null;
@@ -172,8 +179,10 @@ export class TypeChecker {
       case 'Identifier': {
         const symbol = this.symbolTable.lookup(node.name);
         if (!symbol) {
-          throw new Error(`Undefined variable: ${node.name}`);
+          this.addError(`Undefined variable: ${node.name}`, 0);
+          return DataType.Any;
         }
+        symbol.isUsed = true;
         return symbol.type;
       }
       
@@ -183,28 +192,31 @@ export class TypeChecker {
         
         if (node.operator === '=') {
           if (node.left.type !== 'Identifier') {
-            throw new Error('Invalid assignment target');
+            this.addError('Invalid assignment target', 0);
+          } else {
+            const symbol = this.symbolTable.lookup((node.left as any).name);
+            if (symbol) {
+              symbol.isInitialized = true;
+            }
           }
-          
-          if (leftType !== rightType && leftType !== DataType.Any && rightType !== DataType.Any) {
-            throw new Error(`Type mismatch: cannot assign ${rightType} to ${leftType}`);
-          }
-          
-          this.symbolTable.markInitialized((node.left as any).name);
           return leftType;
         }
         
-        if (['+', '-', '*', '/'].includes(node.operator)) {
-          if (leftType !== DataType.Number || rightType !== DataType.Number) {
-            throw new Error(`Arithmetic operator '${node.operator}' requires numbers`);
+        if (['+', '-', '*', '/', '%'].includes(node.operator)) {
+          if (leftType !== DataType.Number && leftType !== DataType.Any) {
+            this.addError(`Arithmetic operator '${node.operator}' requires numbers`, 0);
+          }
+          if (rightType !== DataType.Number && rightType !== DataType.Any) {
+            this.addError(`Arithmetic operator '${node.operator}' requires numbers`, 0);
           }
           return DataType.Number;
         }
         
         if (['==', '!=', '<', '>', '<=', '>='].includes(node.operator)) {
-          if (leftType !== rightType && leftType !== DataType.Any && rightType !== DataType.Any) {
-            throw new Error(`Cannot compare ${leftType} and ${rightType}`);
-          }
+          return DataType.Boolean;
+        }
+        
+        if (['&&', '||'].includes(node.operator)) {
           return DataType.Boolean;
         }
         
@@ -214,9 +226,13 @@ export class TypeChecker {
       case 'UnaryExpression': {
         const argType = this.getExpressionType(node.argument);
         
+        if (node.operator === '!') {
+          return DataType.Boolean;
+        }
+        
         if (node.operator === '-') {
-          if (argType !== DataType.Number) {
-            throw new Error('Unary minus requires a number');
+          if (argType !== DataType.Number && argType !== DataType.Any) {
+            this.addError('Unary minus requires a number', 0);
           }
           return DataType.Number;
         }
@@ -224,9 +240,29 @@ export class TypeChecker {
         return DataType.Any;
       }
       
+      case 'CallExpression': {
+        const calleeType = this.getExpressionType(node.callee);
+        for (const arg of node.arguments) {
+          this.getExpressionType(arg);
+        }
+        return DataType.Any;
+      }
+      
+      case 'MemberExpression': {
+        this.getExpressionType(node.object);
+        if (node.property.type === 'Identifier') {
+          return DataType.Any;
+        }
+        return DataType.Any;
+      }
+      
       default:
         return DataType.Any;
     }
+  }
+
+  private addError(message: string, line: number): void {
+    this.errors.push({ message, line });
   }
 
   public getErrors(): Array<{ message: string; line: number }> {
