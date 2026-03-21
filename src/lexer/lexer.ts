@@ -42,7 +42,6 @@ export class Lexer {
     const c = this.advance();
     
     switch (c) {
-      // Single-character tokens
       case '(': return this.createToken(TokenType.LeftParen, '(');
       case ')': return this.createToken(TokenType.RightParen, ')');
       case '{': return this.createToken(TokenType.LeftBrace, '{');
@@ -55,8 +54,9 @@ export class Lexer {
       case '+': return this.createToken(TokenType.Plus, '+');
       case '-': return this.createToken(TokenType.Minus, '-');
       case '*': return this.createToken(TokenType.Star, '*');
+      case '%': 
+        return this.createToken(TokenType.Percent, '%');
       
-      // Two-character operators
       case '=':
         if (this.match('=')) {
           return this.createToken(TokenType.EqualsEquals, '==');
@@ -80,27 +80,34 @@ export class Lexer {
           return this.createToken(TokenType.GreaterThanEquals, '>=');
         }
         return this.createToken(TokenType.GreaterThan, '>');
-        
+
+      case '&':
+        if (this.match('&')) {
+          return this.createToken(TokenType.And, '&&');
+        }
+        throw this.error(`Unexpected character '&'`);
+      
+      case '|':
+        if (this.match('|')) {
+          return this.createToken(TokenType.Or, '||');
+        }
+        throw this.error(`Unexpected character '|'`);
+
       case '/':
-        // Handle comments
         if (this.match('/')) {
-          // Line comment - consume until newline
           while (this.peek() !== '\n' && !this.isAtEnd()) {
             this.advance();
           }
           return null;
         } else if (this.match('*')) {
-          // Block comment - consume until */
           this.handleBlockComment();
           return null;
         }
         return this.createToken(TokenType.Slash, '/');
         
-      // Whitespace
       case ' ':
       case '\r':
       case '\t':
-        // Ignore whitespace
         return null;
         
       case '\n':
@@ -108,7 +115,6 @@ export class Lexer {
         this.column = 1;
         return null;
         
-      // String literals
       case '"':
       case "'":
         return this.scanString(c);
@@ -136,7 +142,6 @@ export class Lexer {
       throw this.error('Unterminated string');
     }
     
-    // Consume closing quote
     this.advance();
     
     return this.createToken(TokenType.String, `"${value}"`, value);
@@ -147,9 +152,7 @@ export class Lexer {
       this.advance();
     }
     
-    // Look for decimal part
     if (this.peek() === '.' && this.isDigit(this.peekNext())) {
-      // Consume the dot
       this.advance();
       
       while (this.isDigit(this.peek())) {
@@ -179,7 +182,6 @@ export class Lexer {
   private handleBlockComment(): void {
     while (!this.isAtEnd()) {
       if (this.peek() === '*' && this.peekNext() === '/') {
-        // Consume the closing */
         this.advance();
         this.advance();
         return;
@@ -196,7 +198,6 @@ export class Lexer {
     throw this.error('Unterminated block comment');
   }
 
-  // Helper methods
   private advance(): string {
     this.column++;
     return this.source[this.current++];
