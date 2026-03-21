@@ -78,6 +78,7 @@ export interface MemberExpression {
 export type Expression = 
   | BinaryExpression
   | UnaryExpression
+  | MemberExpression
   | CallExpression
   | Identifier
   | Literal;
