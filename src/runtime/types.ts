@@ -1,3 +1,5 @@
+import { JSFunction } from './functions.js';
+
 export enum RuntimeType {
   Undefined = 'Undefined',
   Null = 'Null',
