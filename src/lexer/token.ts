@@ -22,6 +22,8 @@ export enum TokenType {
   Star = 'Star',
   Slash = 'Slash',
   Percent = 'Percent',
+
+  Dot = 'Dot',
   
   EqualsEquals = 'EqualsEquals',
   NotEquals = 'NotEquals',
@@ -40,6 +42,8 @@ export enum TokenType {
   RightParen = 'RightParen',
   LeftBrace = 'LeftBrace',
   RightBrace = 'RightBrace',
+  LeftBracket = 'LeftBracket',
+  RightBracket = 'RightBracket',
   Semicolon = 'Semicolon',
   Comma = 'Comma',
 
