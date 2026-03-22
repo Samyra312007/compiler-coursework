@@ -190,7 +190,16 @@ export class XSMGenerator {
     this.freeRegister(reg2);
   }
 
+
   private generateAssign(inst: TACInstruction): void {
+    if (inst.result === 'print') {
+      const reg = this.getRegister(inst.arg1 || '0');
+      this.emit(`MOV R0, R${reg}`);
+      this.emit(`CALL print`);
+      this.freeRegister(reg);
+      return;
+    }
+    
     if (inst.arg1 && !isNaN(Number(inst.arg1))) {
       const reg = this.allocateRegister();
       this.emit(`MOV R${reg}, ${inst.arg1}`);
