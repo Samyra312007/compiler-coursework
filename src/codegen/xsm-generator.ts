@@ -73,6 +73,12 @@ export class XSMGenerator {
       case TACOp.RETURN:
         this.generateReturn(inst);
         break;
+      case TACOp.CALL:
+        this.generateCall(inst);
+        break;
+      case TACOp.PARAM:
+        this.generateParam(inst);
+        break;
       case TACOp.EQ:
       case TACOp.NE:
       case TACOp.LT:
@@ -83,6 +89,26 @@ export class XSMGenerator {
         break;
     }
   }
+
+  private generateCall(inst: TACInstruction): void {
+    if (inst.arg1 === 'print') {
+      const argReg = this.getRegister(inst.result || '');
+      this.emit(`MOV R0, R${argReg}`);
+      this.emit(`CALL print`);
+      this.freeRegister(argReg);
+    } else {
+      this.emit(`CALL ${inst.arg1}`);
+    }
+  }
+
+  private generateParam(inst: TACInstruction): void {
+    if (inst.arg1) {
+      const reg = this.getRegister(inst.arg1);
+      this.emit(`PUSH R${reg}`);
+      this.freeRegister(reg);
+    }
+  }
+
 
   private generateAdd(inst: TACInstruction): void {
     const reg1 = this.getRegister(inst.arg1!);
