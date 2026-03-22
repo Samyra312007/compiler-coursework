@@ -1,85 +1,79 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-interface TestResult {
-    name: string;
-    passed: boolean;
-    duration: number;
-    output: string[];
-    error?: string;
-}
-
-class TestRunner {
-    private testFile: string;
+async function runTest(testFile: string) {
+  console.log('\n' + '='.repeat(80));
+  console.log(`Testing: ${path.basename(testFile)}`);
+  console.log('='.repeat(80));
+  
+  const sourceCode = fs.readFileSync(testFile, 'utf-8');
+  console.log('\nSource Code:');
+  console.log('-'.repeat(40));
+  console.log(sourceCode);
+  
+  try {
+    console.log('\nBuilding compiler...');
+    execSync('npm run build', { 
+      stdio: 'pipe', 
+      cwd: path.dirname(__dirname),
+      encoding: 'utf-8'
+    });
+    console.log('Build complete');
     
-    constructor(testFile: string) {
-        this.testFile = testFile;
-    }
+    console.log('\nRunning compiler with debug output...\n');
+    const compilerPath = path.join(__dirname, '../dist/cli.js');
     
-    async run(): Promise<TestResult> {
-        const startTime = Date.now();
-        const result: TestResult = {
-            name: path.basename(this.testFile),
-            passed: false,
-            duration: 0,
-            output: []
-        };
-        
-        console.log('\n' + '='.repeat(80));
-        console.log(`Testing: ${path.basename(this.testFile)}`);
-        console.log('='.repeat(80));
-        
-        const sourceCode = fs.readFileSync(this.testFile, 'utf-8');
-        console.log('\nSource Code:');
-        console.log('-'.repeat(40));
-        console.log(sourceCode);
-        
-        try {
-            const compilerPath = path.join(__dirname, '../dist/cli.js');
-            
-            if (!fs.existsSync(compilerPath)) {
-                throw new Error('Compiler not built. Run `npm run build` first.');
-            }
-            
-            const output = execSync(
-                `node ${compilerPath} ${this.testFile} --debug`,
-                { encoding: 'utf-8', stdio: 'pipe' }
-            );
-            
-            result.output = output.split('\n');
-            result.passed = true;
-            
-            console.log('\nTest passed!');
-            
-        } catch (error: any) {
-            result.error = error.message;
-            result.passed = false;
-            console.log('\nTest failed!');
-            console.log('Error:', error.message);
-            if (error.stdout) console.log('Output:', error.stdout);
-            if (error.stderr) console.log('Stderr:', error.stderr);
+    const compiler = spawn('node', [compilerPath, testFile, '--debug'], {
+      cwd: path.dirname(__dirname),
+      stdio: 'pipe'
+    });
+    
+    let output = '';
+    
+    compiler.stdout.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      process.stdout.write(text);
+    });
+    
+    compiler.stderr.on('data', (data) => {
+      const text = data.toString();
+      output += text;
+      process.stderr.write(text);
+    });
+    
+    await new Promise((resolve, reject) => {
+      compiler.on('close', (code) => {
+        if (code === 0) {
+          resolve(true);
+        } else {
+          reject(new Error(`Compiler exited with code ${code}`));
         }
-        
-        result.duration = Date.now() - startTime;
-        console.log(`\n⏱️ Duration: ${result.duration}ms`);
-        console.log('='.repeat(80) + '\n');
-        
-        return result;
-    }
+      });
+    });
+    
+    console.log('\n' + '='.repeat(80));
+    console.log('Test passed!');
+    console.log('='.repeat(80) + '\n');
+    
+  } catch (error: any) {
+    console.log('\nTest failed!');
+    if (error.message) console.log('Error:', error.message);
+    console.log('='.repeat(80) + '\n');
+  }
 }
 
 const testFile = process.argv[2];
 
 if (!testFile) {
-    console.error('Please provide a test file');
-    console.log('Usage: npm run test:file tests/test1.js');
-    process.exit(1);
+  console.error('Please provide a test file');
+  console.log('Usage: npm run test:file tests/test1.js');
+  process.exit(1);
 }
 
-const runner = new TestRunner(testFile);
-runner.run().catch(console.error);
+runTest(testFile).catch(console.error);
