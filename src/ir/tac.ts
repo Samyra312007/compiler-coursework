@@ -77,9 +77,22 @@ export class TACGenerator {
         return this.generateIdentifier(node);
       case 'Literal':
         return this.generateLiteral(node);
+      case 'CallExpression':
+        return this.generateCallExpression(node);
+      case 'MemberExpression':
+        return this.generateMemberExpression(node);
       default:
         return null;
     }
+  }
+
+  private generateMemberExpression(node: any): string {
+    const object = this.generateNode(node.object);
+    const property = node.property.name;
+    if (object === 'console' && property === 'log') {
+      return 'print';
+    }
+    return property;
   }
 
   private generateProgram(node: any): string | null {
@@ -87,6 +100,27 @@ export class TACGenerator {
       this.generateNode(stmt);
     }
     return null;
+  }
+
+  private generateCallExpression(node: any): string {
+    const callee = this.generateNode(node.callee);
+    const temp = this.newTemp();
+    for (const arg of node.arguments) {
+      const argVal = this.generateNode(arg);
+      if (argVal) {
+        this.addInstruction({
+          op: TACOp.PARAM,
+          arg1: argVal
+        });
+      }
+    }
+    this.addInstruction({
+      op: TACOp.CALL,
+      result: temp,
+      arg1: callee || ''
+    });
+    
+    return temp;
   }
 
   private generateVariableDeclaration(node: any): string | null {
