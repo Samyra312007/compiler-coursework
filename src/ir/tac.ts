@@ -226,6 +226,17 @@ export class TACGenerator {
   }
 
   private generateBinaryExpression(node: any): string {
+    if(node.operator === '='){
+      const right = this.generateNode(node.right);
+      if(right){
+        this.addInstruction({
+          op: TACOp.ASSIGN,
+          result: node.left.name,
+          arg1: right
+        });
+      }
+      return node.left.name;
+    }
     const left = this.generateNode(node.left);
     const right = this.generateNode(node.right);
     const result = this.newTemp();

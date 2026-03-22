@@ -15,11 +15,10 @@
     "test:ast": "node dist/cli.js test.js --dump-ast",
     "test:tac": "node dist/cli.js test.js --dump-tac",
     "prepublishOnly": "npm run build",
-    "test:runner": "ts-node tests/runner.ts",
-    "test:file": "ts-node tests/debug-runner.ts"
+    "test:file": "ts-node tests/runner.ts"
   },
   "devDependencies": {
-    "@types/node": "^25.4.0",
+    "@types/node": "^25.5.0",
     "nodemon": "^3.1.14",
     "rimraf": "^6.1.3",
     "ts-node": "^10.9.2",

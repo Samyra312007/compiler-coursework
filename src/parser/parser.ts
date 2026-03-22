@@ -52,7 +52,7 @@ export class Parser {
       return this.parseReturnStatement();
     }
     
-    if (this.match(TokenType.LeftBrace)) {
+    if (this.check(TokenType.LeftBrace)) {
       return this.parseBlockStatement();
     }
     
@@ -64,6 +64,10 @@ export class Parser {
     const declarations: VariableDeclaration['declarations'] = [];
     
     do {
+      if (!this.check(TokenType.Identifier)) {
+        throw this.error("Expected variable name after 'let' or 'const'");
+      }
+      
       const id = this.parseIdentifier();
       let init: Expression | null = null;
       
@@ -117,9 +121,12 @@ export class Parser {
     const test = this.parseExpression();
     this.consume(TokenType.RightParen, "Expected ')' after condition");
     
-    const consequent = this.parseStatement()!;
-    let alternate: Statement | null = null;
+    const consequent = this.parseStatement();
+    if(!consequent){
+      throw this.error("Expected statement after if condition");
+    }
     
+    let alternate: Statement | null = null;
     if (this.match(TokenType.Else)) {
       alternate = this.parseStatement();
     }
@@ -147,6 +154,8 @@ export class Parser {
   }
 
   private parseBlockStatement(): BlockStatement {
+    this.consume(TokenType.LeftBrace, "Expected '{' to start block");
+
     const statements: Statement[] = [];
     
     while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
@@ -412,7 +421,10 @@ export class Parser {
     }
     
     if (this.match(TokenType.Identifier)) {
-      return this.parseIdentifier();
+      return {
+        type: 'Identifier',
+        name: this.previous().lexeme
+      };
     }
     
     if (this.match(TokenType.LeftParen)) {
@@ -425,9 +437,14 @@ export class Parser {
   }
 
   private parseIdentifier(): Identifier {
+    if (!this.check(TokenType.Identifier)) {
+      throw this.error("Expected identifier");
+    }
+    
+    const token = this.advance();
     return {
       type: 'Identifier',
-      name: this.previous().lexeme
+      name: token.lexeme
     };
   }
 

@@ -68,8 +68,6 @@ export class TypeChecker {
       if (decl.init) {
         const initType = this.getExpressionType(decl.init);
         type = initType;
-      } else {
-        type = DataType.Any;
       }
       
       this.symbolTable.declare({
