@@ -1,0 +1,14 @@
+let a = 10;
+let b = 20;
+let c = a + b;
+let d = c * 2;
+let e = d / 4;
+let f = e - 5;
+let g = f % 3;
+console.log(a);
+console.log(b);
+console.log(c);
+console.log(d);
+console.log(e);
+console.log(f);
+console.log(g);
