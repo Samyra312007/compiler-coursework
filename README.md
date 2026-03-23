@@ -1,5 +1,4 @@
 # JavaScript Compiler in TypeScript
-[![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/Samyra312007/compiler-coursework)
 
 This repository contains the coursework for a compiler project. It is a compiler built with TypeScript that translates a subset of JavaScript into machine code for the XSM (eXperimental Stack Machine) architecture.
 
