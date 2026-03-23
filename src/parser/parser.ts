@@ -5,7 +5,8 @@ import {
   IfStatement, WhileStatement, BlockStatement,
   BinaryExpression, Identifier, Literal, 
   ReturnStatement, ExpressionStatement, UnaryExpression,
-  MemberExpression, CallExpression
+  MemberExpression, CallExpression, ArrayLiteral, ArrowFunctionExpression, 
+  ObjectLiteral, ObjectProperty, RegexLiteral, NewExpression
 } from '../ast/ast-types.js';
 
 export class Parser {
@@ -207,7 +208,7 @@ export class Parser {
     if (this.match(TokenType.Equals)) {
       const value = this.parseAssignment();
       
-      if (expr.type === 'Identifier') {
+      if (expr.type === 'Identifier' || expr.type === 'MemberExpression') {
         return {
           type: 'BinaryExpression',
           operator: '=',
@@ -338,8 +339,67 @@ export class Parser {
         argument
       };
     }
+
+    if (this.match(TokenType.New)) {
+      return this.parseNewExpression();
+    }
     
     return this.parseCall();
+  }
+
+  private parseNewExpression(): NewExpression {
+    const callee = this.parseMemberExpression();
+    
+    const args: Expression[] = [];
+    
+    if (this.match(TokenType.LeftParen)) {
+      if (!this.check(TokenType.RightParen)) {
+        do {
+          args.push(this.parseExpression());
+        } while (this.match(TokenType.Comma));
+      }
+      this.consume(TokenType.RightParen, "Expected ')' after constructor arguments");
+    }
+    
+    return {
+      type: 'NewExpression',
+      callee,
+      arguments: args
+    };
+  }
+
+  private parseMemberExpression(): Expression {
+    let expr = this.parsePrimary();
+    
+    while (true) {
+      if (this.match(TokenType.Dot)) {
+        const name = this.consume(TokenType.Identifier, "Expected property name after '.'");
+        expr = {
+          type: 'MemberExpression',
+          object: expr,
+          property: {
+            type: 'Identifier',
+            name: name.lexeme
+          },
+          computed: false
+        };
+      }
+      else if (this.match(TokenType.LeftBracket)) {
+        const property = this.parseExpression();
+        this.consume(TokenType.RightBracket, "Expected ']' after property");
+        expr = {
+          type: 'MemberExpression',
+          object: expr,
+          property: property,
+          computed: true
+        };
+      }
+      else {
+        break;
+      }
+    }
+    
+    return expr;
   }
 
   private parseCall(): Expression {
@@ -393,6 +453,129 @@ export class Parser {
     return expr;
   }
 
+  private parseArrayLiteral(): ArrayLiteral {
+    const elements: Expression[] = [];
+    
+    if(!this.check(TokenType.RightBracket)) {
+      do {
+        const element = this.parseExpression();
+        elements.push(element);
+      } while (this.match(TokenType.Comma));
+    }
+
+    this.consume(TokenType.RightBracket, "Expected ']' after array literal");
+
+    return {
+      type: 'ArrayLiteral',
+      elements
+    };
+  }
+
+  private parseObjectLiteral(): ObjectLiteral {
+    const properties: ObjectProperty[] = [];
+    
+    if (!this.check(TokenType.RightBrace)) {
+      do {
+        const property = this.parseObjectProperty();
+        properties.push(property);
+      } while (this.match(TokenType.Comma));
+    }
+    
+    this.consume(TokenType.RightBrace, "Expected '}' after object literal");
+    
+    return {
+      type: 'ObjectLiteral',
+      properties
+    };
+  }
+
+  private parseObjectProperty(): ObjectProperty {
+    let key: Identifier | Literal;
+    let computed = false;
+    
+    if (this.match(TokenType.String)) {
+      key = {
+        type: 'Literal',
+        value: this.previous().literal as string
+      };
+    }
+    else if (this.match(TokenType.Identifier)) {
+      key = {
+        type: 'Identifier',
+        name: this.previous().lexeme
+      };
+    }
+    else if (this.match(TokenType.LeftBracket)) {
+      computed = true;
+      key = this.parseExpression() as any;
+      this.consume(TokenType.RightBracket, "Expected ']' after computed property name");
+    }
+    else {
+      throw this.error("Expected property key");
+    }
+    
+    this.consume(TokenType.Colon, "Expected ':' after property key");
+    
+    const value = this.parseExpression();
+    
+    return {
+      type: 'ObjectProperty',
+      key,
+      value,
+      computed
+    };
+  }
+
+  private parseArrowFunction(): ArrowFunctionExpression {
+    const params: Identifier[] = [];
+    
+    if (this.check(TokenType.Identifier)) {
+      const id = this.parseIdentifier();
+      params.push(id);
+      
+      this.consume(TokenType.Equals, "Expected '=>' in arrow function");
+      this.consume(TokenType.GreaterThan, "Expected '=>' in arrow function");
+    } else if (this.match(TokenType.LeftParen)) {
+      if (!this.check(TokenType.RightParen)) {
+        do {
+          if (!this.check(TokenType.Identifier)) {
+            throw this.error("Expected parameter name in arrow function");
+          }
+          params.push(this.parseIdentifier());
+        } while (this.match(TokenType.Comma));
+      }
+      
+      this.consume(TokenType.RightParen, "Expected ')' after parameters");
+      
+      this.consume(TokenType.Equals, "Expected '=>' in arrow function");
+      this.consume(TokenType.GreaterThan, "Expected '=>' in arrow function");
+    } else {
+      throw this.error("Expected parameters for arrow function");
+    }
+    
+    return this.parseArrowFunctionBody(params);
+  }
+
+  private parseArrowFunctionBody(params: Identifier[]): ArrowFunctionExpression {
+    let body: Expression | BlockStatement;
+    let expression = true;
+    
+    if (this.check(TokenType.LeftBrace)) {
+      body = this.parseBlockStatement();
+      expression = false;
+    } else {
+      body = this.parseExpression();
+      expression = true;
+    }
+    
+    return {
+      type: 'ArrowFunctionExpression',
+      params,
+      body: body as any,
+      expression
+    };
+  }
+
   private parsePrimary(): Expression {
     if (this.match(TokenType.Number)) {
       return {
@@ -407,7 +590,23 @@ export class Parser {
         value: this.previous().literal as string
       };
     }
-    
+
+    if (this.match(TokenType.Regex)) {
+      const literal = this.previous().literal;
+      if (literal && typeof literal === 'object' && 'pattern' in literal && 'flags' in literal) {
+        return {
+          type: 'RegexLiteral',
+          pattern: (literal as any).pattern,
+          flags: (literal as any).flags
+        };
+      }
+      return {
+        type: 'RegexLiteral',
+        pattern: '',
+        flags: ''
+      };
+    }
+        
     if (this.match(TokenType.True)) {
       return { type: 'Literal', value: true };
     }
@@ -420,14 +619,85 @@ export class Parser {
       return { type: 'Literal', value: null };
     }
     
-    if (this.match(TokenType.Identifier)) {
-      return {
-        type: 'Identifier',
-        name: this.previous().lexeme
-      };
+    if (this.match(TokenType.LeftBracket)) {
+      return this.parseArrayLiteral();
     }
     
+    if (this.match(TokenType.LeftBrace)) {
+      return this.parseObjectLiteral();
+    }
+
+    if (this.match(TokenType.Identifier)) {
+      const id = {
+        type: 'Identifier' as const,
+        name: this.previous().lexeme
+      };
+
+      if (this.match(TokenType.Equals) && this.check(TokenType.GreaterThan)) {
+        this.advance();
+
+        let body: Expression | BlockStatement;
+        let expression = true;
+
+        if (this.match(TokenType.LeftBrace)) {
+          body = this.parseBlockStatement();
+          expression = false;
+        } else {
+          body = this.parseExpression();
+          expression = true;
+        }
+
+        return {
+          type: 'ArrowFunctionExpression',
+          params: [id],
+          body: body as any,
+          expression
+        };
+      }
+
+      return id;
+    }
+
     if (this.match(TokenType.LeftParen)) {
+      const savedPosition = this.current;
+      const params: Identifier[] = [];
+      if(!this.check(TokenType.RightParen)) {
+        do {
+          if(!this.check(TokenType.Identifier)) {
+            this.current = savedPosition;
+            break;
+          }
+          params.push(this.parseIdentifier());
+        } while (this.match(TokenType.Comma));
+      }
+
+      if(this.check(TokenType.RightParen)) {
+        this.advance();
+
+        if (this.match(TokenType.Equals) && this.check(TokenType.GreaterThan)) {
+          this.advance();
+          
+          let body: Expression | BlockStatement;
+          let expression = true;
+
+          if(this.match(TokenType.LeftBrace)) {
+            body = this.parseBlockStatement();
+            expression = false;
+          } else {
+            body = this.parseExpression();
+            expression = true;
+          }
+
+          return {
+            type: 'ArrowFunctionExpression',
+            params,
+            body: body as any,
+            expression
+          };
+        }
+      }
+
+      this.current = savedPosition;
       const expr = this.parseExpression();
       this.consume(TokenType.RightParen, "Expected ')' after expression");
       return expr;

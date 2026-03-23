@@ -81,9 +81,137 @@ export class TACGenerator {
         return this.generateCallExpression(node);
       case 'MemberExpression':
         return this.generateMemberExpression(node);
+      case 'ArrayLiteral':
+        return this.generateArrayLiteral(node);
+      case 'ArrowFunctionExpression':
+        return this.generateArrowFunction(node);
+      case 'ObjectLiteral':
+        return this.generateObjectLiteral(node);
+      case 'RegexLiteral':
+        return this.generateRegexLiteral(node);
+      case 'NewExpression':
+        return this.generateNewExpression(node);
       default:
         return null;
     }
+  }
+
+  private generateNewExpression(node: any): string {
+    const temp = this.newTemp();
+    const callee = this.generateNode(node.callee);
+    
+    for (const arg of node.arguments) {
+      const argVal = this.generateNode(arg);
+      if (argVal) {
+        this.addInstruction({
+          op: TACOp.PARAM,
+          arg1: argVal
+        });
+      }
+    }
+    
+    this.addInstruction({
+      op: TACOp.CALL,
+      result: temp,
+      arg1: callee || ''
+    });
+    
+    return temp;
+  }
+
+  private generateRegexLiteral(node: any): string {
+    const temp = this.newTemp();
+    const regexStr = `/${node.pattern}/${node.flags}`;
+
+    this.addInstruction({
+      op: TACOp.ASSIGN,
+      result: temp,
+      arg1: regexStr
+    });
+    return temp;
+  }
+  
+  private generateObjectLiteral(node: any): string {
+    const temp = this.newTemp();    
+    this.addInstruction({
+      op: TACOp.ASSIGN,
+      result: temp,
+      arg1: '{}'
+    });
+    
+    for (const prop of node.properties) {
+      let key: string;
+      if (prop.key.type === 'Identifier') {
+        key = prop.key.name;
+      } else {
+        key = String(prop.key.value);
+      }
+      
+      const value = this.generateNode(prop.value);
+      if (value) {
+        this.addInstruction({
+          op: TACOp.CALL,
+          result: temp,
+          arg1: 'setProperty'
+        });
+        this.addInstruction({
+          op: TACOp.PARAM,
+          arg1: key
+        });
+        this.addInstruction({
+          op: TACOp.PARAM,
+          arg1: value
+        });
+      }
+    }
+    return temp;
+  }
+
+  private generateArrowFunction(node: any): string {
+    const temp = this.newTemp();
+    const label = this.newLabel();
+    
+    this.addInstruction({
+      op: TACOp.LABEL,
+      label,
+      result: temp
+    });
+    
+    this.addInstruction({
+      op: TACOp.ASSIGN,
+      result: temp,
+      arg1: `func_${label}`
+    });
+    
+    return temp;
+  }
+
+
+  private generateArrayLiteral(node: any): string {
+    const temp = this.newTemp();
+
+    this.addInstruction({
+      op: TACOp.ASSIGN,
+      result: temp,
+      arg1: '[]'
+    });
+
+    for (const element of node.elements) {
+      const elementVal = this.generateNode(element);
+      if (elementVal) {
+        this.addInstruction({
+          op: TACOp.CALL,
+          result: temp,
+          arg1: 'push'
+        });
+        this.addInstruction({
+          op: TACOp.PARAM,
+          arg1: elementVal
+        });
+      }
+    }
+
+    return temp;
   }
 
   private generateMemberExpression(node: any): string {
@@ -226,17 +354,42 @@ export class TACGenerator {
   }
 
   private generateBinaryExpression(node: any): string {
-    if(node.operator === '='){
-      const right = this.generateNode(node.right);
-      if(right){
+    if (node.operator === '=') {
+      if (node.left.type === 'Identifier') {
+        const right = this.generateNode(node.right);
+        if (right) {
+          this.addInstruction({
+            op: TACOp.ASSIGN,
+            result: node.left.name,
+            arg1: right
+          });
+        }
+        return node.left.name;
+      }
+      else if (node.left.type === 'MemberExpression') {
+        const object = this.generateNode(node.left.object);
+        const property = node.left.property.name;
+        const value = this.generateNode(node.right);
+        
+        const temp = this.newTemp();
         this.addInstruction({
           op: TACOp.ASSIGN,
-          result: node.left.name,
-          arg1: right
+          result: temp,
+          arg1: object || ''
         });
+        
+        if (value) {
+          this.addInstruction({
+            op: TACOp.STORE,
+            result: `${temp}.${property}`,
+            arg1: value
+          });
+        }
+        return temp;
       }
-      return node.left.name;
+      throw new Error(`Invalid assignment target: ${node.left.type}`);
     }
+    
     const left = this.generateNode(node.left);
     const right = this.generateNode(node.right);
     const result = this.newTemp();

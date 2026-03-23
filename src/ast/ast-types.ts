@@ -75,12 +75,53 @@ export interface MemberExpression {
   computed: boolean; 
 }
 
+export interface ArrayLiteral {
+  type: 'ArrayLiteral';
+  elements: Expression[];
+}
+
+export interface ArrowFunctionExpression {
+  type: 'ArrowFunctionExpression';
+  params: Identifier[];
+  body: Expression | BlockStatement;
+  expression: boolean;
+}
+
+export interface ObjectProperty {
+  type: 'ObjectProperty';
+  key: Identifier | Literal;
+  value: Expression;
+  computed: boolean;
+}
+
+export interface ObjectLiteral {
+  type: 'ObjectLiteral';
+  properties: ObjectProperty[];
+}
+
+export interface RegexLiteral {
+  type: 'RegexLiteral';
+  pattern: string;
+  flags: string;
+}
+
+export interface NewExpression {
+  type: 'NewExpression';
+  callee: Expression;
+  arguments: Expression[];
+}
+
 export type Expression = 
   | BinaryExpression
   | UnaryExpression
   | MemberExpression
   | CallExpression
+  | NewExpression
+  | ArrayLiteral
+  | ObjectLiteral
+  | ArrowFunctionExpression
   | Identifier
+  | RegexLiteral
   | Literal;
 
 export interface BinaryExpression {

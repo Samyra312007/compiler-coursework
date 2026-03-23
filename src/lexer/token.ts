@@ -12,10 +12,12 @@ export enum TokenType {
   True = 'True',
   False = 'False',
   Null = 'Null',
+  New = 'new',
   
   Identifier = 'Identifier',
   Number = 'Number',
   String = 'String',
+  Regex = 'Regex',
   
   Plus = 'Plus',
   Minus = 'Minus',
@@ -24,6 +26,7 @@ export enum TokenType {
   Percent = 'Percent',
 
   Dot = 'Dot',
+  Colon = 'Colon',
   
   EqualsEquals = 'EqualsEquals',
   NotEquals = 'NotEquals',

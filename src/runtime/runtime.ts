@@ -54,11 +54,15 @@ export class JavaScriptRuntime {
     );
     
     this.globalContext.declare('Map', 
-      wrapNativeFunction(() => new JSMap())
+      wrapNativeFunction((...args: any[]) => {
+        return new JSMap();
+      })
     );
     
     this.globalContext.declare('Set', 
-      wrapNativeFunction(() => new JSSet())
+      wrapNativeFunction((...args: any[]) => {
+        return new JSSet();
+      })
     );
     
     this.globalContext.declare('WeakMap', 

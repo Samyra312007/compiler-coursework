@@ -12,6 +12,7 @@ export enum DataType {
   Object = 'Object',
   Array = 'Array',
   Function = 'Function',
+  RegExp = 'RegExp',
   Null = 'Null',
   Undefined = 'Undefined',
   Any = 'Any',
@@ -120,6 +121,42 @@ export class SymbolTable {
       name: 'JSON',
       kind: SymbolKind.Builtin,
       type: DataType.Object,
+      declaredAt: 0,
+      isInitialized: true,
+      isUsed: false
+    });
+    
+    this.currentScope.declare({
+      name: 'Map',
+      kind: SymbolKind.Builtin,
+      type: DataType.Function,
+      declaredAt: 0,
+      isInitialized: true,
+      isUsed: false
+    });
+    
+    this.currentScope.declare({
+      name: 'Set',
+      kind: SymbolKind.Builtin,
+      type: DataType.Function,
+      declaredAt: 0,
+      isInitialized: true,
+      isUsed: false
+    });
+    
+    this.currentScope.declare({
+      name: 'Array',
+      kind: SymbolKind.Builtin,
+      type: DataType.Function,
+      declaredAt: 0,
+      isInitialized: true,
+      isUsed: false
+    });
+    
+    this.currentScope.declare({
+      name: 'RegExp',
+      kind: SymbolKind.Builtin,
+      type: DataType.Function,
       declaredAt: 0,
       isInitialized: true,
       isUsed: false

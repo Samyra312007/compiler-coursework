@@ -6,6 +6,7 @@ export class Lexer {
   private current: number = 0;
   private line: number = 1;
   private column: number = 1;
+  private tokens: Token[] = [];
   
   private static keywords: Map<string, TokenType> = new Map([
     ['let', TokenType.Let],
@@ -18,7 +19,8 @@ export class Lexer {
     ['return', TokenType.Return],
     ['true', TokenType.True],
     ['false', TokenType.False],
-    ['null', TokenType.Null]
+    ['null', TokenType.Null],
+    ['new', TokenType.New]
   ]);
 
   constructor(source: string) {
@@ -26,16 +28,20 @@ export class Lexer {
   }
 
   public scanTokens(): Token[] {
-    const tokens: Token[] = [];
+    this.tokens = [];
+    this.start = 0;
+    this.current = 0;
+    this.line = 1;
+    this.column = 1;
     
     while (!this.isAtEnd()) {
       this.start = this.current;
       const token = this.scanToken();
-      if (token) tokens.push(token);
+      if (token) this.tokens.push(token);
     }
     
-    tokens.push(this.createToken(TokenType.EOF, ''));
-    return tokens;
+    this.tokens.push(this.createToken(TokenType.EOF, ''));
+    return this.tokens;
   }
 
   private scanToken(): Token | null {
@@ -51,6 +57,7 @@ export class Lexer {
       case ';': return this.createToken(TokenType.Semicolon, ';');
       case ',': return this.createToken(TokenType.Comma, ',');
       case '.': return this.createToken(TokenType.Dot, '.');
+      case ':': return this.createToken(TokenType.Colon, ':');
       case '+': return this.createToken(TokenType.Plus, '+');
       case '-': return this.createToken(TokenType.Minus, '-');
       case '*': return this.createToken(TokenType.Star, '*');
@@ -67,7 +74,7 @@ export class Lexer {
         if (this.match('=')) {
           return this.createToken(TokenType.NotEquals, '!=');
         }
-        throw this.error(`Unexpected character '!'`);
+        return this.createToken(TokenType.Not, '!');
         
       case '<':
         if (this.match('=')) {
@@ -94,6 +101,9 @@ export class Lexer {
         throw this.error(`Unexpected character '|'`);
 
       case '/':
+        if (this.isRegexStart()) {
+          return this.scanRegex();
+        }
         if (this.match('/')) {
           while (this.peek() !== '\n' && !this.isAtEnd()) {
             this.advance();
@@ -128,6 +138,65 @@ export class Lexer {
         }
         throw this.error(`Unexpected character '${c}'`);
     }
+  }
+
+  private isRegexStart(): boolean {
+    if (this.tokens.length === 0) return true;
+    
+    const prevToken = this.tokens[this.tokens.length - 1];
+    if (!prevToken) return true;
+    
+    const regexAllowedAfter = [
+      TokenType.Equals, TokenType.LeftParen, TokenType.LeftBracket,
+      TokenType.LeftBrace, TokenType.Comma, TokenType.Return,
+      TokenType.Let, TokenType.Const, TokenType.If, TokenType.While,
+      TokenType.For
+    ];
+    
+    return regexAllowedAfter.includes(prevToken.type);
+  }
+
+  private scanRegex(): Token {
+    let pattern = '';
+    let inClass = false;
+    
+    while (!this.isAtEnd()) {
+      const c = this.peek();
+      
+      if (c === '/' && !inClass) {
+        this.advance(); 
+        break;
+      }
+      
+      if (c === '\\') {
+        pattern += this.advance(); 
+        if (!this.isAtEnd()) {
+          pattern += this.advance(); 
+        }
+      } else if (c === '[') {
+        inClass = true;
+        pattern += this.advance();
+      } else if (c === ']') {
+        inClass = false;
+        pattern += this.advance();
+      } else if (c === '\n') {
+        throw this.error('Unterminated regex literal');
+      } else {
+        pattern += this.advance();
+      }
+    }
+    
+    let flags = '';
+    while (this.isRegexFlag(this.peek())) {
+      flags += this.advance();
+    }
+    
+    const regexStr = `/${pattern}/${flags}`;
+    return this.createToken(TokenType.Regex, regexStr, { pattern, flags });
+  }
+
+  private isRegexFlag(c: string): boolean {
+    return ['g', 'i', 'm', 's', 'u', 'y'].includes(c);
   }
 
   private scanString(quote: string): Token {

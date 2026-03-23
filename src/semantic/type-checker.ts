@@ -1,4 +1,4 @@
-import { ASTNode, Program, Statement, Expression } from '../ast/ast-types.js';
+import { ASTNode, Program, Statement, Expression, BlockStatement } from '../ast/ast-types.js';
 import { SymbolTable, SymbolKind, DataType } from './symbol-table.js';
 
 export class TypeChecker {
@@ -51,6 +51,8 @@ export class TypeChecker {
         break;
       case 'ExpressionStatement':
         this.visitExpression((node as any).expression);
+        break;
+      default:
         break;
     }
   }
@@ -183,21 +185,50 @@ export class TypeChecker {
         symbol.isUsed = true;
         return symbol.type;
       }
+
+      case 'NewExpression': {
+        if (node.callee.type === 'Identifier') {
+          const symbol = this.symbolTable.lookup(node.callee.name);
+          if (!symbol) {
+            this.addError(`Undefined constructor: ${node.callee.name}`, 0);
+            return DataType.Any;
+          }
+          if (symbol.kind !== SymbolKind.Builtin && symbol.kind !== SymbolKind.Function) {
+            this.addError(`${node.callee.name} is not a constructor`, 0);
+            return DataType.Any;
+          }
+        } else {
+          this.getExpressionType(node.callee);
+        }
+        
+        for (const arg of node.arguments) {
+          this.getExpressionType(arg);
+        }
+        
+        return DataType.Object;
+      }
+
+      case 'RegexLiteral':
+        return DataType.RegExp;
       
       case 'BinaryExpression': {
         const leftType = this.getExpressionType(node.left);
         const rightType = this.getExpressionType(node.right);
         
         if (node.operator === '=') {
-          if (node.left.type !== 'Identifier') {
+          if (node.left.type !== 'Identifier' && node.left.type !== 'MemberExpression') {
             this.addError('Invalid assignment target', 0);
           } else {
-            const symbol = this.symbolTable.lookup((node.left as any).name);
-            if (symbol) {
-              symbol.isInitialized = true;
+            if (node.left.type === 'MemberExpression') {
+              this.getExpressionType(node.left.object);
+            } else if (node.left.type === 'Identifier') {
+              const symbol = this.symbolTable.lookup((node.left as any).name);
+              if (symbol) {
+                symbol.isInitialized = true;
+              }
             }
           }
-          return leftType;
+          return rightType;
         }
         
         if (['+', '-', '*', '/', '%'].includes(node.operator)) {
@@ -255,6 +286,50 @@ export class TypeChecker {
         }
         return DataType.Any;
       }
+
+      case 'ArrayLiteral': {
+        for (const element of node.elements) {
+          this.getExpressionType(element);
+        }
+        return DataType.Array;
+      }
+
+      case 'ArrowFunctionExpression': {
+        this.symbolTable.enterScope();
+        
+        for (const param of node.params) {
+          this.symbolTable.declare({
+            name: param.name,
+            kind: SymbolKind.Parameter,
+            type: DataType.Any,
+            declaredAt: 0,
+            isInitialized: true,
+            isUsed: false
+          });
+        }
+        
+        if (node.expression) {
+          const bodyExpr = node.body as Expression;
+          this.getExpressionType(bodyExpr);
+        } else {
+          const bodyBlock = node.body as BlockStatement;
+          this.visitBlockStatement(bodyBlock);
+        }
+        
+        this.symbolTable.exitScope();
+        
+        return DataType.Function;
+      }
+
+      case 'ObjectLiteral': {
+        for (const prop of node.properties) {
+          this.getExpressionType(prop.value);
+        }
+        return DataType.Object;
+      }
+    
+      default:
+        return DataType.Any;
     }
   }
 
